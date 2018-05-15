@@ -21,11 +21,11 @@ static const uint8_t default_regs[][2] = {
     {COM4,          0x01}, /* bypass PLL */
     {CLKRC,         0xC0}, /* Res/Bypass pre-scalar */
 
-    // QVGA Window Size
-    {HSTART,        0x3F},
-    {HSIZE,         0x50},
-    {VSTART,        0x03},
-    {VSIZE,         0x78},
+    // VGA Window Size
+    {HSTART,        0x23},
+    {HSIZE,         0xA0},
+    {VSTART,        0x07},
+    {VSIZE,         0x70},
     {HREF,          0x00},
 
     // Scale down to QVGA Resolution
@@ -144,17 +144,19 @@ static int set_pixformat(sensor_t *sensor, pixformat_t pixformat)
     switch (pixformat) {
         case PIXFORMAT_RGB565:
             reg =  COM7_SET_FMT(reg, COM7_FMT_RGB) | COM7_FMT_RGB565;
+            ret = SCCB_Write(sensor->slv_addr, DSP_CTRL4, 0);
             break;
         case PIXFORMAT_YUV422:
         case PIXFORMAT_GRAYSCALE:
             reg =  COM7_SET_FMT(reg, COM7_FMT_YUV);
+            ret = SCCB_Write(sensor->slv_addr, DSP_CTRL4, 0);
             break;
         default:
             return -1;
     }
 
     // Write back register COM7
-    ret = SCCB_Write(sensor->slv_addr, COM7, reg);
+    ret |= SCCB_Write(sensor->slv_addr, COM7, reg);
 
     // Delay
     systick_sleep(30);
@@ -176,8 +178,25 @@ static int set_framesize(sensor_t *sensor, framesize_t framesize)
     ret |= SCCB_Write(sensor->slv_addr, EXHCH, ((w&0x3) | ((h&0x1) << 2)));
 
     if (framesize < FRAMESIZE_VGA) {
+        // // Enable auto-scaling/zooming factors
+        // ret |= SCCB_Write(sensor->slv_addr, DSPAUTO, 0xFF);
+
+        // Set QVGA Resolution
+        uint8_t reg;
+        reg = SCCB_Read(sensor->slv_addr, COM7);
+        reg = COM7_SET_RES(reg, COM7_RES_QVGA);
+        ret |= SCCB_Write(sensor->slv_addr, COM7, reg);
+
+        // Set QVGA Window Size
+        ret |= SCCB_Write(sensor->slv_addr, HSTART, 0x3F);
+        ret |= SCCB_Write(sensor->slv_addr, HSIZE,  0x50);
+        ret |= SCCB_Write(sensor->slv_addr, VSTART, 0x03);
+        ret |= SCCB_Write(sensor->slv_addr, VSIZE,  0x78);
+        ret |= SCCB_Write(sensor->slv_addr, HREF,   0x00);
+
         // Enable auto-scaling/zooming factors
         ret |= SCCB_Write(sensor->slv_addr, DSPAUTO, 0xFF);
+
     } else {
         // Disable auto-scaling/zooming factors
         ret |= SCCB_Write(sensor->slv_addr, DSPAUTO, 0xF3);

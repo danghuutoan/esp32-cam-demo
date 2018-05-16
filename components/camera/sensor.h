@@ -14,7 +14,7 @@
 #define OV9650_PID     (0x96)
 #define OV2640_PID     (0x26)
 #define OV7725_PID     (0x77)
-
+#define OV7670_PID     (0x76)
 
 typedef struct {
     uint8_t MIDH;
@@ -129,6 +129,12 @@ typedef struct _sensor {
     int  (*set_hmirror)         (sensor_t *sensor, int enable);
     int  (*set_vflip)           (sensor_t *sensor, int enable);
     int  (*set_special_effect)  (sensor_t *sensor, sde_t sde);
+
+    int  (*set_hue)             (sensor_t *sensor, int level);
+    int  (*set_ov7670_night_mode)  (sensor_t *sensor, int sde); //sde_t sde);
+    int  (*set_ov7670_light_mode)  (sensor_t *sensor, int sde); //sde_t sde);
+    int  (*set_ov7670_gamma)  (sensor_t *sensor, int sde); //sde_t sde);
+    int  (*set_ov7670_whitebalance)  (sensor_t *sensor, int sde); //sde_t sde);
 } sensor_t;
 
 // Resolution table

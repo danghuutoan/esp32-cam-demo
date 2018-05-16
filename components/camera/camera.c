@@ -43,6 +43,11 @@
 #include "ov7725.h"
 #endif
 
+#if CONFIG_OV7670_SUPPORT
+#include "ov7670.h"
+#include "ov7670_regs.h"
+#endif
+
 #define ENABLE_TEST_PATTERN CONFIG_ENABLE_TEST_PATTERN
 
 #define REG_PID        0x0A
@@ -175,6 +180,12 @@ esp_err_t camera_probe(const camera_config_t* config, camera_model_t* out_camera
             ov7725_init(&s_state->sensor);
             break;
 #endif
+#if CONFIG_OV7670_SUPPORT
+        case OV7670_PID:
+            *out_camera_model = CAMERA_OV7670;
+            ov7670_init(&s_state->sensor);
+            break;
+#endif
         default:
             id->PID = 0;
             *out_camera_model = CAMERA_UNKNOWN;
@@ -211,7 +222,9 @@ esp_err_t camera_init(const camera_config_t* config)
         goto fail;
     }
     s_state->sensor.set_pixformat(&s_state->sensor, pix_format);
-
+    s_state->sensor.set_exposure_ctrl(&s_state->sensor, COM8_AEC_EN);
+    s_state->sensor.set_whitebal(&s_state->sensor, COM8_AEC_EN);
+    s_state->sensor.set_gain_ctrl(&s_state->sensor, COM8_AEC_EN);
 #if ENABLE_TEST_PATTERN
     /* Test pattern may get handy
      if you are unable to get the live image right.
@@ -223,7 +236,7 @@ esp_err_t camera_init(const camera_config_t* config)
 #endif
 
     if (pix_format == PIXFORMAT_GRAYSCALE) {
-        if (s_state->sensor.id.PID != OV7725_PID) {
+        if (s_state->sensor.id.PID != OV7725_PID && s_state->sensor.id.PID != OV7670_PID) {
             ESP_LOGE(TAG, "Grayscale format is only supported for ov7225");
             err = ESP_ERR_NOT_SUPPORTED;
             goto fail;
@@ -239,7 +252,7 @@ esp_err_t camera_init(const camera_config_t* config)
         s_state->in_bytes_per_pixel = 2;       // camera sends YUYV
         s_state->fb_bytes_per_pixel = 1;       // frame buffer stores Y8
     } else if (pix_format == PIXFORMAT_RGB565) {
-        if (s_state->sensor.id.PID != OV7725_PID) {
+        if (s_state->sensor.id.PID != OV7725_PID && s_state->sensor.id.PID != OV7670_PID) {
             ESP_LOGE(TAG, "RGB565 format is only supported for ov7225");
             err = ESP_ERR_NOT_SUPPORTED;
             goto fail;
@@ -307,7 +320,7 @@ esp_err_t camera_init(const camera_config_t* config)
         goto fail;
     }
 
-    s_state->data_ready = xQueueCreate(16, sizeof(size_t));
+    s_state->data_ready = xQueueCreate(128*4, sizeof(size_t));
     s_state->frame_ready = xSemaphoreCreateBinary();
     if (s_state->data_ready == NULL || s_state->frame_ready == NULL) {
         ESP_LOGE(TAG, "Failed to create semaphores");
@@ -447,18 +460,18 @@ static esp_err_t dma_desc_init()
     ESP_LOGD(TAG, "DMA buffer size: %d, DMA buffers per line: %d", buf_size, dma_per_line);
     ESP_LOGD(TAG, "DMA buffer count: %d", dma_desc_count);
 
-    s_state->dma_buf = (dma_elem_t**) malloc(sizeof(dma_elem_t*) * dma_desc_count);
+    s_state->dma_buf = (dma_elem_t**) heap_caps_malloc(sizeof(dma_elem_t*) * dma_desc_count, MALLOC_CAP_DMA);
     if (s_state->dma_buf == NULL) {
         return ESP_ERR_NO_MEM;
     }
-    s_state->dma_desc = (lldesc_t*) malloc(sizeof(lldesc_t) * dma_desc_count);
+    s_state->dma_desc = (lldesc_t*) heap_caps_malloc(sizeof(lldesc_t) * dma_desc_count, MALLOC_CAP_DMA);
     if (s_state->dma_desc == NULL) {
         return ESP_ERR_NO_MEM;
     }
     size_t dma_sample_count = 0;
     for (int i = 0; i < dma_desc_count; ++i) {
         ESP_LOGD(TAG, "Allocating DMA buffer #%d, size=%d", i, buf_size);
-        dma_elem_t* buf = (dma_elem_t*) malloc(buf_size);
+        dma_elem_t* buf = (dma_elem_t*) heap_caps_malloc(buf_size, MALLOC_CAP_DMA);
         if (buf == NULL) {
             return ESP_ERR_NO_MEM;
         }

@@ -16,7 +16,7 @@
 
 static const uint8_t default_regs[][2] = {
     {COM3,          COM3_SWAP_YUV},
-    {COM7,          COM7_RES_QVGA | COM7_FMT_YUV},
+    {COM7,          COM7_RES_VGA | COM7_FMT_YUV | COM7_FMT_RGB},
 
     {COM4,          0x01}, /* bypass PLL */
     {CLKRC,         0xC0}, /* Res/Bypass pre-scalar */
@@ -101,12 +101,12 @@ static const uint8_t default_regs[][2] = {
     {DBSTEP,        0x03},
 
     // Lens Correction, should be tuned with real camera module
-    {LC_RADI,       0x10},
-    {LC_COEF,       0x10},
-    {LC_COEFB,      0x14},
-    {LC_COEFR,      0x17},
-    {LC_CTR,        0x05},
-    {COM5,          0xF5}, //0x65
+    {LC_RADI,       0x30},
+    {LC_COEF,       0x30},
+    // {LC_COEFB,      0x14},
+    // {LC_COEFR,      0x17},
+    {LC_CTR,        0x01},
+    {COM5,          0xD5}, //0x65
 
     {0x00,          0x00},
 };
@@ -198,6 +198,27 @@ static int set_framesize(sensor_t *sensor, framesize_t framesize)
         ret |= SCCB_Write(sensor->slv_addr, DSPAUTO, 0xFF);
 
     } else {
+        // // Disable auto-scaling/zooming factors
+        // ret |= SCCB_Write(sensor->slv_addr, DSPAUTO, 0xF3);
+
+        // // Clear auto-scaling/zooming factors
+        // ret |= SCCB_Write(sensor->slv_addr, SCAL0, 0x00);
+        // ret |= SCCB_Write(sensor->slv_addr, SCAL1, 0x00);
+        // ret |= SCCB_Write(sensor->slv_addr, SCAL2, 0x00);
+
+        // Set VGA Resolution
+        uint8_t reg;
+        reg = SCCB_Read(sensor->slv_addr, COM7);
+        reg = COM7_SET_RES(reg, COM7_RES_VGA);
+        ret |= SCCB_Write(sensor->slv_addr, COM7, reg);
+
+        // Set VGA Window Size
+        ret |= SCCB_Write(sensor->slv_addr, HSTART, 0x23);
+        ret |= SCCB_Write(sensor->slv_addr, HSIZE,  0xA0);
+        ret |= SCCB_Write(sensor->slv_addr, VSTART, 0x07);
+        ret |= SCCB_Write(sensor->slv_addr, VSIZE,  0xF0);
+        ret |= SCCB_Write(sensor->slv_addr, HREF,   0x00);
+
         // Disable auto-scaling/zooming factors
         ret |= SCCB_Write(sensor->slv_addr, DSPAUTO, 0xF3);
 
